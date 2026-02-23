@@ -1,21 +1,38 @@
-/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
+@import "tailwindcss/preflight";
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
 
-/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
-@import "tailwindcss";
+@theme {
+    --color-accent: #c59dff;
+    --color-accent-hover: #b080ff;
+    --color-accent-subtle: rgba(197, 157, 255, 0.08);
+    --color-accent-border: rgba(197, 157, 255, 0.25);
 
-/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
+    --color-surface: #0f0f0f;
+    --color-surface-elevated: #141414;
+
+    --color-dark-bg: #000000;
+    --color-dark-border: #222222;
+    --color-dark-text-primary: #ffffff;
+    --color-dark-text-secondary: #888888;
+    --color-dark-text-tertiary: #555555;
+
+    --font-mono:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+}
 
 :root {
-    --bg-main: #000000;
-    --bg-surface: #0f0f0f;
-    --bg-elevated: #141414;
-    --border-dark: #222222;
-    --text-primary: #ffffff;
-    --text-secondary: #888888;
-    --accent-primary: #c59dff;
-    --accent-hover: #b080ff;
-    --accent-subtle: rgba(197, 157, 255, 0.08);
-    --accent-border: rgba(197, 157, 255, 0.25);
+    --bg-main: var(--color-dark-bg);
+    --bg-surface: var(--color-surface);
+    --bg-elevated: var(--color-surface-elevated);
+    --border-dark: var(--color-dark-border);
+    --text-primary: var(--color-dark-text-primary);
+    --text-secondary: var(--color-dark-text-secondary);
+    --accent-primary: var(--color-accent);
+    --accent-hover: var(--color-accent-hover);
+    --accent-subtle: var(--color-accent-subtle);
+    --accent-border: var(--color-accent-border);
 }
 body {
     background-color: var(--bg-main);
