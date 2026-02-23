@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: back-end/Dockerfile
+    ports:
+      - "3000:3000"
+    develop:
+      watch:
+        - action: sync
+          path: ./back-end
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./package.json
+
+  frontend:
+    build:
+      context: .
+      dockerfile: front-end/Dockerfile
+    ports:
+      - "5173:5173"
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - node_modules/
+            - back-end/
+        - action: rebuild
+          path: ./package.json
