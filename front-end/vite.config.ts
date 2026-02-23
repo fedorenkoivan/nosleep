@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:3000', // Redirects all /api calls to Express
+      '/api': 'http://localhost:3000',
     },
   },
 })
