@@ -222,3 +222,16 @@ model villages {
 
   @@index([geom], type: Gist)
 }
+
+model county_tax {
+  id     Int     @id @default(autoincrement())
+  county String  @db.VarChar(40)
+  tax    Decimal @db.Decimal
+}
+
+model user {
+  id     Int     @id @default(autoincrement())
+  name String  @db.VarChar(40)
+  email String  @db.VarChar(40)
+  password String  @db.VarChar(40)
+}

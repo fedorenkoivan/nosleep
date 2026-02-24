@@ -1,3 +1,6 @@
+-- Enable PostGIS extension
+CREATE EXTENSION IF NOT EXISTS "postgis";
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
