@@ -8,6 +8,9 @@ async function main() {
         }
     })
     console.log("Counties:", counties)
+
+    const allCounties = await prisma.counties_Tax.findMany()
+    console.log("Current Counties in DB:", allCounties)
 }
 
 main()
