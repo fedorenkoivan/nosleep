@@ -1,7 +1,8 @@
 import { Client } from 'pg';
+import 'dotenv/config';
 
 const client = new Client({
-  connectionString: "",
+  connectionString: process.env.DATABASE_URL,
 });
 
 async function checkTax() {
@@ -14,7 +15,6 @@ async function checkTax() {
   `);
 
   console.log(res.rows);
-  // console.log(process.env.DATABASE_URL); // TODO: parse db url from env
   await client.end();
 }
 
