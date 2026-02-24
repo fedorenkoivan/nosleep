@@ -31,3 +31,13 @@ services:
             - back-end/
         - action: rebuild
           path: ./package.json
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=no_sleep
+    ports:
+      - "5432:5432"
