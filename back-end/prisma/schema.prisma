@@ -229,9 +229,15 @@ model county_tax {
   tax    Decimal @db.Decimal
 }
 
+model city_tax {
+  id   Int     @id @default(autoincrement())
+  city String  @db.VarChar(40)
+  tax  Decimal @db.Decimal
+}
+
 model user {
-  id     Int     @id @default(autoincrement())
-  name String  @db.VarChar(40)
-  email String  @db.VarChar(40)
-  password String  @db.VarChar(40)
+  id       Int    @id @default(autoincrement())
+  name     String @db.VarChar(40)
+  email    String @db.VarChar(40)
+  password String @db.VarChar(40)
 }
