@@ -1,21 +1,15 @@
 {
-  "version": 2,
   "buildCommand": "./build.sh",
-  "builds": [
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
+  "outputDirectory": "front-end/dist",
+  "functions": {
+    "api/*.ts": {
+      "includeFiles": "api/dist/**,api/generated/**,api/node_modules/**,api/prisma/**"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/front-end/dist/$1"
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     }
-  ],
-  "outputDirectory": "front-end/dist"
+  ]
 }
