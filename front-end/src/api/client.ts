@@ -21,10 +21,12 @@ async function fetchApi<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
+  const isFormData = options.body instanceof FormData;
+
   const config: RequestInit = {
     ...options,
-    headers: {
+    headers: isFormData ? {} : {
       'Content-Type': 'application/json',
       ...options.headers,
     },
@@ -98,6 +100,24 @@ export const api = {
       }
       const queryString = queryParams.toString();
       return fetchApi(`/orders${queryString ? `?${queryString}` : ''}`);
+    },
+
+    import: (file: File, user_id: number): Promise<{
+      message: string;
+      imported: number;
+      failed: number;
+      errors: { id: string; reason: string }[];
+      orders: { id: string; order_id: number }[];
+    }> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('user_id', String(user_id));
+
+      return fetchApi('/orders/import', {
+        method: 'POST',
+        body: formData,
+        headers: {},
+      });
     },
   },
 };

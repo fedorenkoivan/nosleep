@@ -1,6 +1,11 @@
 import express, { type Request, type Response } from 'express';
 import { prisma } from './src/lib/prisma.js';
 import * as orderService from './src/services/orderService.js';
+import multer from 'multer';
+import { parse } from 'csv-parse';
+import { Readable } from 'stream';
+
+type MulterRequest = Request & { file?: Express.Multer.File };
 
 const app = express();
 
@@ -330,6 +335,151 @@ app.get('/orders', async (req: Request, res: Response) => {
       error: 'Помилка при отриманні замовлень',
       details: error instanceof Error ? error.message : String(error)
     });
+  }
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res: Response) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { user_id } = req.body;
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const userId = parseInt(user_id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'user_id must be a number' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: `User with ID ${userId} not found` });
+    }
+
+    const records: any[] = await new Promise((resolve, reject) => {
+      const results: any[] = [];
+      Readable.from(req.file!.buffer)
+        .pipe(parse({ columns: true, trim: true, skip_empty_lines: true }))
+        .on('data', (row) => results.push(row))
+        .on('end', () => resolve(results))
+        .on('error', reject);
+    });
+
+    if (records.length === 0) {
+      return res.status(400).json({ error: 'CSV file is empty' });
+    }
+
+    // Step 1: validate all rows first
+    const validRows: { record: any; lng: number; lat: number; amount: number }[] = [];
+    const failed: { id: string; reason: string }[] = [];
+
+    for (const record of records) {
+      const { id, longitude, latitude, subtotal } = record;
+      const lng = parseFloat(longitude);
+      const lat = parseFloat(latitude);
+      const amount = parseFloat(subtotal);
+
+      if (isNaN(lng) || isNaN(lat)) {
+        failed.push({ id, reason: 'Invalid coordinates' });
+        continue;
+      }
+      if (isNaN(amount) || amount <= 0) {
+        failed.push({ id, reason: 'Invalid subtotal' });
+        continue;
+      }
+
+      validRows.push({ record, lng, lat, amount });
+    }
+
+    // Step 2: process all valid rows in parallel
+    const BATCH_SIZE = 20;
+    const ordersToInsert: any[] = [];
+
+    for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+      const batch = validRows.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.all(
+        batch.map(async ({ record, lng, lat, amount }) => {
+          const { id, timestamp } = record;
+          try {
+            const taxResult = await orderService.calculateTax(amount, lng, lat);
+            return {
+              success: true,
+              id,
+              data: {
+                user_id:              userId,
+                subtotal:             amount,
+                longitude:            lng,
+                latitude:             lat,
+                tax_rate:             taxResult.compositeRate / 100,
+                state_tax:            taxResult.state_tax,
+                county_tax:           taxResult.county_tax,
+                city_tax:             taxResult.city_tax,
+                special_tax:          taxResult.special_tax,
+                tax_amount:           taxResult.tax_amount,
+                total_amount:         taxResult.total_amount,
+                applied_jurisdiction: taxResult.appliedName,
+                jurisdiction_level:   taxResult.appliedLevel,
+                county_name:          taxResult.countyName,
+                city_name:            taxResult.cityName,
+                status:               'pending',
+                ...(timestamp ? { created_at: new Date(timestamp) } : {}),
+              }
+            };
+          } catch (err) {
+            return {
+              success: false,
+              id,
+              reason: err instanceof Error ? err.message : 'Failed to process order',
+            };
+          }
+        })
+      );
+
+      for (const result of batchResults) {
+        if (result.success) {
+          ordersToInsert.push(result);
+        } else {
+          failed.push({ id: result.id, reason: result.reason! });
+        }
+      }
+    }
+
+    // Step 3: batch insert all successful orders at once
+    const success: { id: string; order_id: number }[] = [];
+
+    if (ordersToInsert.length > 0) {
+      const inserted = await Promise.all(
+        ordersToInsert.map(({ id, data }) =>
+          prisma.order.create({ data }).then((order) => ({ id, order_id: order.id }))
+        )
+      );
+      success.push(...inserted);
+    }
+
+    res.status(201).json({
+      message: `Imported ${success.length} orders, ${failed.length} failed`,
+      imported: success.length,
+      failed: failed.length,
+      errors: failed,
+      orders: success,
+    });
+
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({
+      error: 'Failed to import orders',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[/orders/import] completed in ${duration}s`);
   }
 });
 
