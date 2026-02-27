@@ -3,6 +3,20 @@ import { prisma } from './src/lib/prisma.js';
 import * as orderService from './src/services/orderService.js';
 
 const app = express();
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 app.use(express.json());
 
 const PORT = 3000;
@@ -143,6 +157,82 @@ app.get('/tax-rate', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Помилка при обробці запиту' });
   }
 });
+
+// POST /calculate-tax - Розрахунок податку без створення замовлення
+app.post('/calculate-tax', async (req: Request, res: Response) => {
+  try {
+    const { subtotal, longitude, latitude } = req.body;
+
+    // Валідація
+    if (!subtotal || !longitude || !latitude) {
+      return res.status(400).json({ 
+        error: 'Необхідно вказати subtotal, longitude та latitude' 
+      });
+    }
+
+    const amount = parseFloat(subtotal);
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(amount) || isNaN(lng) || isNaN(lat)) {
+      return res.status(400).json({ 
+        error: 'Некоректні значення параметрів' 
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        error: 'Сума повинна бути більше 0' 
+      });
+    }
+
+    // Використовуємо функцію з orderService
+    const taxResult = await orderService.calculateTax(amount, lng, lat);
+
+    // Форматуємо відповідь
+    const result = {
+      subtotal: parseFloat(amount.toFixed(2)),
+      tax_amount: taxResult.tax_amount,
+      total_amount: taxResult.total_amount,
+      
+      tax_breakdown: {
+        composite_tax_rate: `${taxResult.compositeRate.toFixed(3)}%`,
+        state_rate: '4.000%',
+        state_tax: taxResult.state_tax,
+        county_rate: `${((taxResult.county_tax / amount) * 100).toFixed(3)}%`,
+        county_tax: taxResult.county_tax,
+        city_rate: `${((taxResult.city_tax / amount) * 100).toFixed(3)}%`,
+        city_tax: taxResult.city_tax,
+        special_rates: `${((taxResult.special_tax / amount) * 100).toFixed(3)}%`,
+        special_tax: taxResult.special_tax
+      },
+
+      jurisdictions: {
+        applied_level: taxResult.appliedLevel,
+        applied_name: taxResult.appliedName,
+        city: taxResult.cityName,
+        county: taxResult.countyName
+      },
+
+      location: {
+        coordinates: { longitude: lng, latitude: lat }
+      }
+    };
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Tax calculation error:', error);
+    res.status(500).json({ 
+      error: 'Помилка при розрахунку податку',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// ============================================
+// ORDERS ENDPOINTS
+// ============================================
 
 app.post('/orders', async (req: Request, res: Response) => {
   try {
