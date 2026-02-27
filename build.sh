@@ -16,7 +16,6 @@ cp -r back-end/dist/* api/dist/
 cp -r back-end/generated/* api/generated/
 cp -r back-end/node_modules api/
 cp back-end/prisma/schema.prisma api/prisma/
-cp back-end/prisma.config.ts api/ 2>/dev/null || true
 
 echo "🎨 Building frontend..."
 cd front-end
