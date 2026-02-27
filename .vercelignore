@@ -1,0 +1,10 @@
+node_modules
+.env.local
+.env*.local
+dist
+Shapefiles
+.git
+.docker
+docker-compose.yaml
+Dockerfile
+*.log

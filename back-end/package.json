@@ -5,8 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js"
+    "build": "tsc && prisma generate",
+    "start": "node dist/server.js",
+    "vercel-build": "prisma generate && tsc"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",

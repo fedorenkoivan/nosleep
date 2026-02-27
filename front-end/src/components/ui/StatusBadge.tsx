@@ -1,4 +1,3 @@
-import React from "react";
 export type StatusType = "pending" | "completed" | "failed" | "processing";
 interface StatusBadgeProps {
     status: StatusType | string;
