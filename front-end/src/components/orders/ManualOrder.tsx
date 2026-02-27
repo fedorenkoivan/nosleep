@@ -5,6 +5,11 @@ import { Input } from "../ui/Input";
 import { Card } from "../ui/Card";
 import { api, ApiError } from "../../api/client";
 import type { TaxCalculation } from "../../types/order.types";
+import { CoordinatePickerMap } from "./CoordinatePickerMap";
+
+function formatCoord(value: number) {
+    return value.toFixed(6);
+}
 
 export function ManualOrder() {
     const [formData, setFormData] = useState({
@@ -12,7 +17,7 @@ export function ManualOrder() {
         lon: "",
         subtotal: "",
     });
-    
+
     const [taxData, setTaxData] = useState<TaxCalculation | null>(null);
     const [isCalculating, setIsCalculating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,11 +53,11 @@ export function ManualOrder() {
                 // });
 
                 // Розраховуємо податок
-                const calculation = await api.calculateTax({
+                const calculation = (await api.calculateTax({
                     subtotal,
                     longitude: lon,
                     latitude: lat,
-                }) as TaxCalculation;
+                })) as TaxCalculation;
                 setTaxData(calculation);
             } catch (err) {
                 if (err instanceof ApiError) {
@@ -83,7 +88,7 @@ export function ManualOrder() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!taxData) {
             setError("Please wait for tax calculation to complete");
             return;
@@ -94,15 +99,15 @@ export function ManualOrder() {
         setSuccess(null);
 
         try {
-            const result = await api.orders.create({
+            const result = (await api.orders.create({
                 user_id: 1, // Тимчасово hardcoded, потім можна отримувати з контексту авторизації
                 subtotal: parseFloat(formData.subtotal),
                 longitude: parseFloat(formData.lon),
                 latitude: parseFloat(formData.lat),
-            }) as any;
+            })) as any;
 
             setSuccess(`Order #${result.order.id} created successfully!`);
-            
+
             // Очищаємо форму після успішного створення
             setTimeout(() => {
                 setFormData({ lat: "", lon: "", subtotal: "" });
@@ -128,6 +133,16 @@ export function ManualOrder() {
         setError(null);
         setSuccess(null);
     };
+
+    const setCoordinates = (latitude: number, longitude: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            lat: formatCoord(latitude),
+            lon: formatCoord(longitude),
+        }));
+        setSuccess(null);
+    };
+
     return (
         <div className="max-w-4xl mx-auto">
             <div className="mb-6">
@@ -143,8 +158,16 @@ export function ManualOrder() {
             {error && (
                 <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
                     <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                        <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                        >
+                            <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                clipRule="evenodd"
+                            />
                         </svg>
                         <span>{error}</span>
                     </div>
@@ -154,8 +177,16 @@ export function ManualOrder() {
             {success && (
                 <div className="mb-6 p-4 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400">
                     <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                        <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                        >
+                            <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                            />
                         </svg>
                         <span>{success}</span>
                     </div>
@@ -191,12 +222,28 @@ export function ManualOrder() {
                                 />
                             </div>
 
+                            <div className="space-y-2">
+                                <div className="text-sm font-medium text-dark-text-secondary">
+                                    Or pick coordinates on map
+                                </div>
+                                <CoordinatePickerMap
+                                    lat={formData.lat}
+                                    lon={formData.lon}
+                                    onPick={setCoordinates}
+                                />
+                                <div className="text-xs text-dark-text-tertiary">
+                                    Click the map to set latitude/longitude.
+                                    Drag the marker to fine-tune.
+                                </div>
+                            </div>
+
                             {/* Location Info */}
                             {locationInfo && (
                                 <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                                     <div className="text-sm text-blue-300">
                                         <strong>Location:</strong>{" "}
-                                        {locationInfo.city && `${locationInfo.city}, `}
+                                        {locationInfo.city &&
+                                            `${locationInfo.city}, `}
                                         {locationInfo.county} County, NY
                                     </div>
                                 </div>
@@ -221,7 +268,9 @@ export function ManualOrder() {
                                 <div className="flex items-end">
                                     <div className="text-sm text-dark-text-secondary">
                                         {isCalculating && (
-                                            <span className="text-yellow-400">Calculating tax...</span>
+                                            <span className="text-yellow-400">
+                                                Calculating tax...
+                                            </span>
                                         )}
                                         {/* {taxData && (
                                             <span className="text-green-400">
@@ -233,8 +282,8 @@ export function ManualOrder() {
                             </div>
 
                             <div className="pt-4 flex justify-end gap-3">
-                                <Button 
-                                    type="button" 
+                                <Button
+                                    type="button"
                                     variant="secondary"
                                     onClick={handleReset}
                                 >
@@ -245,7 +294,9 @@ export function ManualOrder() {
                                     leftIcon={<Save className="w-4 h-4" />}
                                     disabled={!taxData || isSubmitting}
                                 >
-                                    {isSubmitting ? "Creating..." : "Create Order"}
+                                    {isSubmitting
+                                        ? "Creating..."
+                                        : "Create Order"}
                                 </Button>
                             </div>
                         </form>
@@ -277,23 +328,72 @@ export function ManualOrder() {
                                     </div>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between text-dark-text-secondary">
-                                            <span>State ({taxData.tax_breakdown.state_rate})</span>
-                                            <span className="font-mono">${taxData.tax_breakdown.state_tax.toFixed(2)}</span>
+                                            <span>
+                                                State (
+                                                {
+                                                    taxData.tax_breakdown
+                                                        .state_rate
+                                                }
+                                                )
+                                            </span>
+                                            <span className="font-mono">
+                                                $
+                                                {taxData.tax_breakdown.state_tax.toFixed(
+                                                    2,
+                                                )}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between text-dark-text-secondary">
-                                            <span>County ({taxData.tax_breakdown.county_rate})</span>
-                                            <span className="font-mono">${taxData.tax_breakdown.county_tax.toFixed(2)}</span>
+                                            <span>
+                                                County (
+                                                {
+                                                    taxData.tax_breakdown
+                                                        .county_rate
+                                                }
+                                                )
+                                            </span>
+                                            <span className="font-mono">
+                                                $
+                                                {taxData.tax_breakdown.county_tax.toFixed(
+                                                    2,
+                                                )}
+                                            </span>
                                         </div>
                                         {taxData.tax_breakdown.city_tax > 0 && (
                                             <div className="flex justify-between text-dark-text-secondary">
-                                                <span>City ({taxData.tax_breakdown.city_rate})</span>
-                                                <span className="font-mono">${taxData.tax_breakdown.city_tax.toFixed(2)}</span>
+                                                <span>
+                                                    City (
+                                                    {
+                                                        taxData.tax_breakdown
+                                                            .city_rate
+                                                    }
+                                                    )
+                                                </span>
+                                                <span className="font-mono">
+                                                    $
+                                                    {taxData.tax_breakdown.city_tax.toFixed(
+                                                        2,
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
-                                        {taxData.tax_breakdown.special_tax > 0 && (
+                                        {taxData.tax_breakdown.special_tax >
+                                            0 && (
                                             <div className="flex justify-between text-dark-text-secondary">
-                                                <span>Special ({taxData.tax_breakdown.special_rates})</span>
-                                                <span className="font-mono">${taxData.tax_breakdown.special_tax.toFixed(2)}</span>
+                                                <span>
+                                                    Special (
+                                                    {
+                                                        taxData.tax_breakdown
+                                                            .special_rates
+                                                    }
+                                                    )
+                                                </span>
+                                                <span className="font-mono">
+                                                    $
+                                                    {taxData.tax_breakdown.special_tax.toFixed(
+                                                        2,
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -316,22 +416,29 @@ export function ManualOrder() {
                                 <div className="border-t-2 border-dashed border-dark-border my-4"></div>
 
                                 <div className="flex items-center justify-between p-4 bg-accent text-black rounded-lg shadow-md">
-                                    <span className="font-medium">Total Due</span>
+                                    <span className="font-medium">
+                                        Total Due
+                                    </span>
                                     <span className="text-2xl font-bold font-mono">
                                         ${taxData.total_amount.toFixed(2)}
                                     </span>
                                 </div>
 
                                 <div className="text-xs text-[#444444] text-center mt-4">
-                                    {taxData.jurisdictions.applied_level}: {taxData.jurisdictions.applied_name}
+                                    {taxData.jurisdictions.applied_level}:{" "}
+                                    {taxData.jurisdictions.applied_name}
                                     <br />
-                                    Rate: {taxData.tax_breakdown.composite_tax_rate}
+                                    Rate:{" "}
+                                    {taxData.tax_breakdown.composite_tax_rate}
                                 </div>
                             </div>
                         ) : (
                             <div className="text-center py-12 text-dark-text-secondary">
                                 <Calculator className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                <p>Enter coordinates and amount to calculate tax</p>
+                                <p>
+                                    Enter coordinates and amount to calculate
+                                    tax
+                                </p>
                             </div>
                         )}
                     </Card>
