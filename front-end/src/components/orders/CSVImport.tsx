@@ -4,7 +4,6 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { api } from "../../api/client";
 
-const MOCK_USER_ID = 1;
 const PAGE_SIZE = 10;
 
 interface ImportResult {
@@ -109,7 +108,7 @@ export function CSVImport() {
     setStatus("uploading");
     setErrorMessage(null);
     try {
-      const data = await api.orders.import(file, MOCK_USER_ID);
+      const data = await api.orders.import(file);
       setResult(data);
       setStatus("complete");
     } catch (err: any) {

@@ -1,13 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminPanel } from "./pages/AdminPanel";
 import { LoginPage } from "./pages/LoginPage";
+import RegisterForm from "./components/auth/RegisterForm";
 
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to="/register" />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterForm />} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
     </BrowserRouter>

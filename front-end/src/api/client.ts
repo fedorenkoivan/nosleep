@@ -24,10 +24,22 @@ async function fetchApi<T>(
 
   const isFormData = options.body instanceof FormData;
 
+  // Get token from localStorage
+  const token = localStorage.getItem('authToken');
+
+  const headers: HeadersInit = isFormData ? {} : {
+    'Content-Type': 'application/json',
+  };
+
+  // Add Authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const config: RequestInit = {
     ...options,
-    headers: isFormData ? {} : {
-      'Content-Type': 'application/json',
+    headers: {
+      ...headers,
       ...options.headers,
     },
   };
@@ -37,6 +49,16 @@ async function fetchApi<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      // If 401, clear token and redirect to login
+      if (response.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        // Only redirect if not already on auth pages
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+          window.location.href = '/login';
+        }
+      }
+
       throw new ApiError(
         data.error || 'Something went wrong',
         response.status,
@@ -54,6 +76,46 @@ async function fetchApi<T>(
 }
 
 export const api = {
+  // Authentication
+  auth: {
+    register: (data: {
+      name: string;
+      email: string;
+      password: string;
+    }): Promise<{
+      message: string;
+      user: { id: number; name: string; email: string };
+      token: string;
+    }> =>
+      fetchApi('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    login: (data: {
+      email: string;
+      password: string;
+    }): Promise<{
+      message: string;
+      user: { id: number; name: string; email: string };
+      token: string;
+    }> =>
+      fetchApi('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    me: (): Promise<{
+      user: { id: number; name: string; email: string; created_at: string };
+    }> =>
+      fetchApi('/auth/me'),
+
+    logout: () => {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    },
+  },
+
   // Tax calculation
   calculateTax: (data: {
     subtotal: number;
@@ -72,7 +134,6 @@ export const api = {
   // Orders
   orders: {
     create: (data: {
-      user_id: number;
       subtotal: number;
       longitude: number;
       latitude: number;
@@ -85,7 +146,6 @@ export const api = {
     list: (params?: {
       page?: number;
       limit?: number;
-      user_id?: number;
       status?: string;
       from_date?: string;
       to_date?: string;
@@ -102,7 +162,7 @@ export const api = {
       return fetchApi(`/orders${queryString ? `?${queryString}` : ''}`);
     },
 
-    import: (file: File, user_id: number): Promise<{
+    import: (file: File): Promise<{
       message: string;
       imported: number;
       failed: number;
@@ -111,12 +171,10 @@ export const api = {
     }> => {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('user_id', String(user_id));
 
       return fetchApi('/orders/import', {
         method: 'POST',
         body: formData,
-        headers: {},
       });
     },
   },
