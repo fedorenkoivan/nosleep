@@ -7,4 +7,4 @@ RUN npm install
 COPY back-end/ . 
 
 EXPOSE 3000
-CMD ["node", "--watch", "server.ts"]
+CMD ["npx", "tsx", "watch", "server.ts"]

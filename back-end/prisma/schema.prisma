@@ -224,15 +224,17 @@ model villages {
 }
 
 model county_tax {
-  id     Int     @id @default(autoincrement())
-  county String  @db.VarChar(40)
-  tax    Decimal @db.Decimal
+  id           Int     @id @default(autoincrement())
+  county       String  @db.VarChar(40)
+  tax          Decimal @db.Decimal
+  special_rate Decimal @default(0) @db.Decimal()
 }
 
 model city_tax {
-  id   Int     @id @default(autoincrement())
-  city String  @db.VarChar(40)
-  tax  Decimal @db.Decimal
+  id           Int     @id @default(autoincrement())
+  city         String  @db.VarChar(40)
+  tax          Decimal @db.Decimal
+  special_rate Decimal @default(0) @db.Decimal()
 }
 
 model user {
