@@ -100,7 +100,6 @@ export function ManualOrder() {
 
         try {
             const result = (await api.orders.create({
-                user_id: 1, // Тимчасово hardcoded, потім можна отримувати з контексту авторизації
                 subtotal: parseFloat(formData.subtotal),
                 longitude: parseFloat(formData.lon),
                 latitude: parseFloat(formData.lat),

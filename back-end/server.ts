@@ -1,6 +1,8 @@
 import express, { type Request, type Response } from 'express';
 import { prisma } from './src/lib/prisma.js';
 import * as orderService from './src/services/orderService.js';
+import * as authService from './src/services/authService.js';
+import { authMiddleware, type AuthRequest } from './src/middleware/auth.js';
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import { Readable } from 'stream';
@@ -41,6 +43,115 @@ async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdictio
   `;
   return jurisdictions;
 }
+
+// ============================================
+// AUTHENTICATION ENDPOINTS
+// ============================================
+
+app.post('/auth/register', async (req: Request, res: Response) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        error: 'Name, email and password are required' 
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        error: 'Invalid email format' 
+      });
+    }
+
+    const result = await authService.registerUser({ name, email, password });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    
+    if (error instanceof Error && error.message.includes('already exists')) {
+      return res.status(409).json({ 
+        error: error.message 
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Registration failed',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post('/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ 
+        error: 'Email and password are required' 
+      });
+    }
+
+    const result = await authService.loginUser({ email, password });
+
+    res.json({
+      message: 'Login successful',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    if (error instanceof Error && error.message.includes('Invalid')) {
+      return res.status(401).json({ 
+        error: error.message 
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Login failed',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.get('/auth/me', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await authService.getUserById(req.userId);
+
+    res.json({ user });
+
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get user data',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// ============================================
+// TAX & LOCATION ENDPOINTS
+// ============================================
 
 app.get('/tax-rate', async (req: Request, res: Response) => {
   try {
@@ -239,22 +350,25 @@ app.post('/calculate-tax', async (req: Request, res: Response) => {
 // ORDERS ENDPOINTS
 // ============================================
 
-app.post('/orders', async (req: Request, res: Response) => {
+app.post('/orders', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { user_id, subtotal, longitude, latitude } = req.body;
+    const { subtotal, longitude, latitude } = req.body;
 
-    if (!user_id || !subtotal || !longitude || !latitude) {
+    if (!subtotal || !longitude || !latitude) {
       return res.status(400).json({ 
-        error: 'Необхідно вказати user_id, subtotal, longitude та latitude' 
+        error: 'Необхідно вказати subtotal, longitude та latitude' 
       });
     }
 
-    const userId = parseInt(user_id);
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const amount = parseFloat(subtotal);
     const lng = parseFloat(longitude);
     const lat = parseFloat(latitude);
 
-    if (isNaN(userId) || isNaN(amount) || isNaN(lng) || isNaN(lat)) {
+    if (isNaN(amount) || isNaN(lng) || isNaN(lat)) {
       return res.status(400).json({ 
         error: 'Некоректні значення параметрів' 
       });
@@ -266,18 +380,8 @@ app.post('/orders', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user) {
-      return res.status(404).json({ 
-        error: `Користувача з ID ${userId} не знайдено` 
-      });
-    }
-
     const order = await orderService.createOrder({
-      user_id: userId,
+      user_id: req.userId,
       subtotal: amount,
       longitude: lng,
       latitude: lat
@@ -297,21 +401,20 @@ app.post('/orders', async (req: Request, res: Response) => {
   }
 });
 
-app.get('/orders', async (req: Request, res: Response) => {
+app.get('/orders', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { page, limit, user_id, status, from_date, to_date } = req.query;
+    const { page, limit, status, from_date, to_date } = req.query;
 
-    const params: any = {};
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const params: any = {
+      user_id: req.userId // Show only orders of authenticated user
+    };
 
     if (page) params.page = parseInt(page as string);
     if (limit) params.limit = parseInt(limit as string);
-
-    if (user_id) {
-      const userId = parseInt(user_id as string);
-      if (!isNaN(userId)) {
-        params.user_id = userId;
-      }
-    }
 
     if (status) {
       params.status = status as string;
@@ -457,7 +560,7 @@ app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res
     if (ordersToInsert.length > 0) {
       const inserted = await Promise.all(
         ordersToInsert.map(({ id, data }) =>
-          prisma.order.create({ data }).then((order) => ({ id, order_id: order.id }))
+          prisma.order.create({ data }).then((order:any) => ({ id, order_id: order.id }))
         )
       );
       success.push(...inserted);

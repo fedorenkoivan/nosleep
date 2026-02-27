@@ -1,10 +1,10 @@
-import LoginForm from "../components/auth/LoginForm";
+import RegisterForm from "../components/auth/RegisterForm";
 import flower from "../images/element1.png";
 import circle1 from "../images/element11.png";
 import ourlogo from "../images/logo.jpg";
 import { Link } from "react-router-dom";
 
-export const LoginPage = () => {
+export const RegisterPage = () => {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center 
     relative overflow-hidden font-sans">
@@ -42,24 +42,24 @@ export const LoginPage = () => {
                       max-w-[380px] 
                       pt-[50px] pb-[40px] px-[55px] text-center mx-4"> 
         
-        <h1 className="text-black text-2xl font-black tracking-[0.2em] uppercase">Welcome Back</h1>
+        <h1 className="text-black text-2xl font-black tracking-[0.2em] uppercase">Create Account</h1>
         
         <p className="mt-[35px] text-gray-500 font-bold text-[9px] tracking-[0.2em] uppercase leading-tight">
-          Please sign in to access <br /> the admin dashboard.
+          Sign up to get started <br /> with our platform
         </p>
         
         <div className="mt-[35px]"> 
-          <LoginForm />
+          <RegisterForm />
         </div>
 
         <div className="mt-6">
           <p className="text-gray-600 text-xs">
-            Don't have an account?{" "}
+            Already have an account?{" "}
             <Link 
-              to="/register" 
+              to="/login" 
               className="text-[#5E35B1] font-bold hover:text-[#7E57C2] transition-colors"
             >
-              Sign Up
+              Sign In
             </Link>
           </p>
         </div>

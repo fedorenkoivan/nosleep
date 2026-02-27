@@ -238,11 +238,14 @@ model city_tax {
 }
 
 model user {
-  id       Int     @id @default(autoincrement())
-  name     String  @db.VarChar(40)
-  email    String  @db.VarChar(40)
-  password String  @db.VarChar(40)
-  orders   Order[]
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(100)
+  email         String   @unique @db.VarChar(100)
+  password_hash String   @db.VarChar(255)
+  password_salt String   @db.VarChar(255)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  orders        Order[]
 }
 
 model Order {
