@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model indian_territories {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  county     String?                  @db.VarChar(50)
+  gnis_id    String?                  @db.VarChar(9)
+  aia_code   String?                  @db.VarChar(4)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ny_cities {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  muni_type  String?                  @db.VarChar(4)
+  munitycode Int?
+  county     String?                  @db.VarChar(50)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(10)
+  swis       String?                  @db.VarChar(6)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  map_symbol String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model ny_cities_shoreline {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  abbrev     String?                  @db.VarChar(4)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(5)
+  swis       String?                  @db.VarChar(6)
+  nysp_zone  String?                  @db.VarChar(11)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  nyc        String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model ny_cities_towns {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  muni_type  String?                  @db.VarChar(4)
+  munitycode Int?
+  county     String?                  @db.VarChar(50)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(10)
+  swis       String?                  @db.VarChar(6)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  map_symbol String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model ny_counties {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  abbrev     String?                  @db.VarChar(4)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(5)
+  swis       String?                  @db.VarChar(6)
+  nysp_zone  String?                  @db.VarChar(11)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  nyc        String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
+model state {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  abbrev     String?                  @db.VarChar(2)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(2)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model state_shoreline {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(50)
+  abbrev     String?                  @db.VarChar(2)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(2)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model towns {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  muni_type  String?                  @db.VarChar(4)
+  munitycode Int?
+  county     String?                  @db.VarChar(50)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(10)
+  swis       String?                  @db.VarChar(6)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  map_symbol String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model villages {
+  gid        Int                      @id @default(autoincrement())
+  name       String?                  @db.VarChar(40)
+  town       String?                  @db.VarChar(50)
+  county     String?                  @db.VarChar(50)
+  gnis_id    String?                  @db.VarChar(9)
+  fips_code  String?                  @db.VarChar(15)
+  swis       String?                  @db.VarChar(6)
+  pop1990    Float?
+  pop2000    Float?
+  pop2010    Float?
+  pop2020    Float?
+  dos_ll     String?                  @db.VarChar(7)
+  dosll_date DateTime?                @db.Date
+  map_symbol String?                  @db.VarChar(1)
+  calc_sq_mi Decimal?                 @db.Decimal
+  datemod    DateTime?                @db.Date
+  shape_leng Decimal?                 @db.Decimal
+  shape_area Decimal?                 @db.Decimal
+  geom       Unsupported("geometry")?
+
+  @@index([geom], type: Gist)
+}
+
+model county_tax {
+  id           Int     @id @default(autoincrement())
+  county       String  @db.VarChar(40)
+  tax          Decimal @db.Decimal
+  special_rate Decimal @default(0) @db.Decimal()
+}
+
+model city_tax {
+  id           Int     @id @default(autoincrement())
+  city         String  @db.VarChar(40)
+  tax          Decimal @db.Decimal
+  special_rate Decimal @default(0) @db.Decimal()
+}
+
+model user {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(100)
+  email         String   @unique @db.VarChar(100)
+  password_hash String   @db.VarChar(255)
+  password_salt String   @db.VarChar(255)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  orders        Order[]
+}
+
+model Order {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       user     @relation(fields: [user_id], references: [id])
+  
+  subtotal   Decimal  @db.Decimal(10, 2)
+  
+  longitude  Decimal  @db.Decimal(10, 8)
+  latitude   Decimal  @db.Decimal(10, 8)
+  
+  tax_rate              Decimal @db.Decimal(6, 5) // composite rate
+  state_tax             Decimal @db.Decimal(10, 2)
+  county_tax            Decimal @db.Decimal(10, 2)
+  city_tax              Decimal @db.Decimal(10, 2)
+  special_tax           Decimal @db.Decimal(10, 2)
+  tax_amount            Decimal @db.Decimal(10, 2)
+  total_amount          Decimal @db.Decimal(10, 2) // subtotal + tax
+  
+  applied_jurisdiction  String  @db.VarChar(100)
+  jurisdiction_level    String  @db.VarChar(20)
+  county_name           String? @db.VarChar(50)
+  city_name             String? @db.VarChar(50)
+  
+  status     String   @db.VarChar(20) @default("pending")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+}

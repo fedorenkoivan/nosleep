@@ -1,7 +1,12 @@
 node_modules
+*/node_modules
+api/node_modules
+api/dist
+api/generated
 
 .env
 
 Shapefiles
 
 back-end/generated/prisma
+back-end/dist
