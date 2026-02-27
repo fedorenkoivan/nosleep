@@ -341,6 +341,7 @@ app.get('/orders', async (req: Request, res: Response) => {
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res: Response) => {
+  const startTime = Date.now();
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -476,6 +477,9 @@ app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res
       error: 'Failed to import orders',
       details: error instanceof Error ? error.message : String(error),
     });
+  } finally {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[/orders/import] completed in ${duration}s`);
   }
 });
 
