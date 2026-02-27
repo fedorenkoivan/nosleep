@@ -4,7 +4,7 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Card } from "../ui/Card";
 import { api, ApiError } from "../../api/client";
-import type { TaxCalculation, OrderResponse } from "../../types/order.types";
+import type { TaxCalculation } from "../../types/order.types";
 
 export function ManualOrder() {
     const [formData, setFormData] = useState({
@@ -41,11 +41,11 @@ export function ManualOrder() {
 
             try {
                 // Отримуємо інформацію про локацію
-                const location = await api.getLocation(lon, lat) as any;
-                setLocationInfo({
-                    city: location.city?.name || null,
-                    county: location.county?.name || null,
-                });
+                // const location = await api.getLocation(lon, lat) as any;
+                // setLocationInfo({
+                //     city: location.city?.name || null,
+                //     county: location.county?.name || null,
+                // });
 
                 // Розраховуємо податок
                 const calculation = await api.calculateTax({
@@ -223,11 +223,11 @@ export function ManualOrder() {
                                         {isCalculating && (
                                             <span className="text-yellow-400">Calculating tax...</span>
                                         )}
-                                        {taxData && (
+                                        {/* {taxData && (
                                             <span className="text-green-400">
                                                 Tax rate: {taxData.tax_breakdown.composite_tax_rate}
                                             </span>
-                                        )}
+                                        )} */}
                                     </div>
                                 </div>
                             </div>
