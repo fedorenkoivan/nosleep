@@ -26,7 +26,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 interface Jurisdiction {
   name: string;
@@ -586,12 +586,11 @@ app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res
   }
 });
 
-// Local development
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
-}
+// Start server (both local and production)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
 
 // Export for Vercel Serverless
 export default app;
