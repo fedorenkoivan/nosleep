@@ -131,9 +131,9 @@ export async function calculateTax(
   return {
     compositeRate,
     state_tax: parseFloat(state_tax.toFixed(2)),
-    county_tax: parseFloat(county_tax.toFixed(2)),
+    county_tax: parseFloat(county_tax.toFixed(3)),
     city_tax: parseFloat(city_tax.toFixed(2)),
-    special_tax: parseFloat(special_tax.toFixed(2)),
+    special_tax: parseFloat(special_tax.toFixed(3)),
     tax_amount: parseFloat(tax_amount.toFixed(2)),
     total_amount: parseFloat(total_amount.toFixed(2)),
     appliedLevel,
