@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
     MapContainer,
     Marker,
@@ -7,12 +7,16 @@ import {
     useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
+
+// Імпорт стилів Leaflet (ОБОВ'ЯЗКОВО для коректного відображення)
+import "leaflet/dist/leaflet.css";
+
+// Виправлення шляхів до іконок (стандартна проблема Leaflet + Webpack/Vite)
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-const DEFAULT_NY_CENTER: [number, number] = [42.9, -75.5];
-
+// Налаштування дефолтної іконки
 const defaultMarkerIcon = L.icon({
     iconUrl: markerIcon,
     iconRetinaUrl: markerIcon2x,
@@ -23,39 +27,53 @@ const defaultMarkerIcon = L.icon({
     shadowSize: [41, 41],
 });
 
+// Центр штату Нью-Йорк [lat, lng]
+const DEFAULT_NY_CENTER: [number, number] = [42.9, -75.5];
+
+// Межі штату Нью-Йорк (Southwest [lat, lng], Northeast [lat, lng])
+const NY_STATE_BOUNDS: L.LatLngBoundsExpression = [
+    [40.496, -79.762], // Southwest
+    [45.015, -71.856], // Northeast
+];
+
 function parseNumber(value: string) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
+    const n = parseFloat(value);
+    return !isNaN(n) && isFinite(n) ? n : null;
 }
 
-function MapRecenter({
-    center,
-    zoom,
-}: {
-    center: [number, number];
-    zoom: number;
-}) {
+/**
+ * Компонент для примусового оновлення виду мапи при зміні координат ззовні
+ */
+function MapRecenter({ center, zoom }: { center: [number, number]; zoom: number }) {
     const map = useMap();
 
     useEffect(() => {
-        map.setView(center, zoom, { animate: false });
-    }, [map, center[0], center[1], zoom]);
+        // Дозволяємо Leaflet перерахувати розміри контейнера
+        map.invalidateSize();
+        // Плавно або миттєво переміщуємо камеру
+        map.setView(center, zoom, { animate: true });
+    }, [map, center, zoom]);
 
     return null;
 }
 
-function MapClickHandler({
-    onPick,
-}: {
-    onPick: (latitude: number, longitude: number) => void;
-}) {
+/**
+ * Обробник кліків по мапі
+ */
+function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
     useMapEvents({
         click(e) {
             onPick(e.latlng.lat, e.latlng.lng);
         },
     });
-
     return null;
+}
+
+interface CoordinatePickerMapProps {
+    lat: string;
+    lon: string;
+    onPick: (latitude: number, longitude: number) => void;
+    heightClassName?: string;
 }
 
 export function CoordinatePickerMap({
@@ -63,41 +81,43 @@ export function CoordinatePickerMap({
     lon,
     onPick,
     heightClassName = "h-80",
-}: {
-    lat: string;
-    lon: string;
-    onPick: (latitude: number, longitude: number) => void;
-    heightClassName?: string;
-}) {
+}: CoordinatePickerMapProps) {
     const latNumber = parseNumber(lat);
     const lonNumber = parseNumber(lon);
     const hasValidCoordinates = latNumber !== null && lonNumber !== null;
 
-    const center: [number, number] = hasValidCoordinates
-        ? [latNumber, lonNumber]
-        : DEFAULT_NY_CENTER;
+    // Використовуємо useMemo, щоб об’єкт center не перестворювався щоразу
+    const center: [number, number] = useMemo(() => 
+        hasValidCoordinates ? [latNumber!, lonNumber!] : DEFAULT_NY_CENTER,
+    [latNumber, lonNumber, hasValidCoordinates]);
 
     const zoom = hasValidCoordinates ? 12 : 7;
 
     return (
-        <div className="rounded-lg overflow-hidden border border-dark-border">
-            <div className={`${heightClassName} w-full`}>
+        <div className="rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+            <div className={`${heightClassName} w-full`} style={{ minHeight: "300px" }}>
                 <MapContainer
                     center={center}
                     zoom={zoom}
-                    scrollWheelZoom
-                    className="h-full w-full"
+                    minZoom={6}
+                    maxZoom={18}
+                    maxBounds={NY_STATE_BOUNDS}
+                    maxBoundsViscosity={1.0}
+                    scrollWheelZoom={true}
+                    style={{ height: "100%", width: "100%" }}
                 >
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
+                    
                     <MapRecenter center={center} zoom={zoom} />
                     <MapClickHandler onPick={onPick} />
+
                     {hasValidCoordinates && (
                         <Marker
                             position={center}
-                            draggable
+                            draggable={true}
                             icon={defaultMarkerIcon}
                             eventHandlers={{
                                 dragend: (event) => {
