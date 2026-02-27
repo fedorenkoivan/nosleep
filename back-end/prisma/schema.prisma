@@ -238,8 +238,41 @@ model city_tax {
 }
 
 model user {
-  id       Int    @id @default(autoincrement())
-  name     String @db.VarChar(40)
-  email    String @db.VarChar(40)
-  password String @db.VarChar(40)
+  id       Int     @id @default(autoincrement())
+  name     String  @db.VarChar(40)
+  email    String  @db.VarChar(40)
+  password String  @db.VarChar(40)
+  orders   Order[]
+}
+
+model Order {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       user     @relation(fields: [user_id], references: [id])
+  
+  subtotal   Decimal  @db.Decimal(10, 2)
+  
+  longitude  Decimal  @db.Decimal(10, 8)
+  latitude   Decimal  @db.Decimal(10, 8)
+  
+  tax_rate              Decimal @db.Decimal(6, 5) // composite rate
+  state_tax             Decimal @db.Decimal(10, 2)
+  county_tax            Decimal @db.Decimal(10, 2)
+  city_tax              Decimal @db.Decimal(10, 2)
+  special_tax           Decimal @db.Decimal(10, 2)
+  tax_amount            Decimal @db.Decimal(10, 2)
+  total_amount          Decimal @db.Decimal(10, 2) // subtotal + tax
+  
+  applied_jurisdiction  String  @db.VarChar(100)
+  jurisdiction_level    String  @db.VarChar(20)
+  county_name           String? @db.VarChar(50)
+  city_name             String? @db.VarChar(50)
+  
+  status     String   @db.VarChar(20) @default("pending")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
 }

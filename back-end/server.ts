@@ -1,112 +1,31 @@
 import express, { type Request, type Response } from 'express';
 import { prisma } from './src/lib/prisma.js';
+import * as orderService from './src/services/orderService.js';
 
 const app = express();
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 app.use(express.json());
 
 const PORT = 3000;
 
-// Типи для юрисдикцій
 interface Jurisdiction {
   name: string;
   level: 'city' | 'county';
 }
 
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: "Hello from Express!" });
-});
-
-// Отримати географічне розташування за координатами
-app.get('/location', async (req: Request, res: Response) => {
-  try {
-    const { longitude, latitude } = req.query;
-
-    if (!longitude || !latitude) {
-      return res.status(400).json({ 
-        error: 'Необхідно вказати параметри longitude та latitude' 
-      });
-    }
-
-    const lon = parseFloat(longitude as string);
-    const lat = parseFloat(latitude as string);
-
-    if (isNaN(lon) || isNaN(lat)) {
-      return res.status(400).json({ 
-        error: 'Некоректні координати' 
-      });
-    }
-
-    // Знаходимо округ (county)
-    const county = await prisma.$queryRaw<Array<{
-      name: string;
-      abbrev: string;
-      fips_code: string;
-      pop2020: number;
-    }>>`
-      SELECT name, abbrev, fips_code, pop2020
-      FROM ny_counties
-      WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326))
-      LIMIT 1
-    `;
-
-    // Знаходимо місто
-    const city = await prisma.$queryRaw<Array<{
-      name: string;
-      muni_type: string;
-      county: string;
-      pop2020: number;
-    }>>`
-      SELECT name, muni_type, county, pop2020
-      FROM ny_cities
-      WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326))
-      LIMIT 1
-    `;
-
-    // Знаходимо town якщо місто не знайдено
-    const town = await prisma.$queryRaw<Array<{
-      name: string;
-      muni_type: string;
-      county: string;
-      pop2020: number;
-    }>>`
-      SELECT name, muni_type, county, pop2020
-      FROM towns
-      WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326))
-      LIMIT 1
-    `;
-
-    // Знаходимо village
-    const village = await prisma.$queryRaw<Array<{
-      name: string;
-      town: string;
-      county: string;
-      pop2020: number;
-    }>>`
-      SELECT name, town, county, pop2020
-      FROM villages
-      WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326))
-      LIMIT 1
-    `;
-
-    const location = {
-      coordinates: {
-        longitude: lon,
-        latitude: lat
-      },
-      county: county[0] || null,
-      city: city[0] || null,
-      town: town[0] || null,
-      village: village[0] || null
-    };
-
-    res.json(location);
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Помилка при обробці запиту' });
-  }
-});
-
-// Функція для отримання юрисдикції за координатами
 async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdiction[]> {
   const jurisdictions = await prisma.$queryRaw<Jurisdiction[]>`
     SELECT name, 'city' as level FROM ny_cities 
@@ -118,194 +37,6 @@ async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdictio
   return jurisdictions;
 }
 
-// API для розрахунку податку
-app.post('/calculate-tax', async (req: Request, res: Response) => {
-  try {
-    const { subtotal, longitude, latitude } = req.body;
-
-    // Валідація вхідних даних
-    if (!subtotal || !longitude || !latitude) {
-      return res.status(400).json({ 
-        error: 'Необхідно вказати subtotal, longitude та latitude' 
-      });
-    }
-
-    const amount = parseFloat(subtotal);
-    const lng = parseFloat(longitude);
-    const lat = parseFloat(latitude);
-
-    if (isNaN(amount) || isNaN(lng) || isNaN(lat)) {
-      return res.status(400).json({ 
-        error: 'Некоректні значення' 
-      });
-    }
-
-    if (amount <= 0) {
-      return res.status(400).json({ 
-        error: 'Сума повинна бути більше 0' 
-      });
-    }
-
-    // Отримуємо юрисдикції (місто та округ)
-    const jurisdictions = await getTaxJurisdiction(lng, lat);
-    
-    if (jurisdictions.length === 0) {
-      return res.status(404).json({ 
-        error: 'Координати поза межами штату Нью-Йорк' 
-      });
-    }
-
-    // Визначаємо пріоритет: спочатку місто, потім округ (згідно з PUB-718)
-    const city = jurisdictions.find(j => j.level === 'city');
-    const county = jurisdictions.find(j => j.level === 'county');
-    
-    let compositeRate: number;
-    let appliedLevel: string;
-    let appliedName: string;
-    let cityRate: number = 0;
-    let countyRate: number = 0;
-    
-    // Отримуємо ставку округу (якщо є)
-    if (county) {
-      const countyTaxData = await prisma.county_tax.findFirst({
-        where: {
-          county: {
-            contains: county.name,
-            mode: 'insensitive'
-          }
-        }
-      });
-      
-      if (countyTaxData) {
-        countyRate = Number(countyTaxData.tax);
-      }
-    }
-    
-    // Отримуємо ставку міста (якщо є) - вона має пріоритет
-    if (city) {
-      const cityTaxData = await prisma.city_tax.findFirst({
-        where: {
-          city: {
-            contains: city.name,
-            mode: 'insensitive'
-          }
-        }
-      });
-      
-      if (cityTaxData) {
-        cityRate = Number(cityTaxData.tax);
-        compositeRate = cityRate;
-        appliedLevel = 'City';
-        appliedName = cityTaxData.city;
-      } else if (countyRate > 0) {
-        compositeRate = countyRate;
-        appliedLevel = 'County';
-        appliedName = county!.name;
-      } else {
-        return res.status(404).json({ 
-          error: `Податкова ставка не знайдена для ${city.name}` 
-        });
-      }
-    } else if (countyRate > 0) {
-      compositeRate = countyRate;
-      appliedLevel = 'County';
-      appliedName = county!.name;
-    } else {
-      return res.status(404).json({ 
-        error: 'Не вдалося визначити податкову ставку' 
-      });
-    }
-
-    // Розрахунок податку (compositeRate вже у відсотках, напр. 8.875)
-    const compositeRateDecimal = compositeRate / 100;
-    const state_rate = 0.04; // 4% фіксована ставка штату NY
-    
-    // Місцевий податок = Підсумковий - Державний
-    const local_rate = compositeRateDecimal - state_rate;
-    
-    // Розбиваємо місцевий податок на складові: county + city + special
-    let city_rate_component = 0;
-    let county_rate_component = 0;
-    let special_rate = 0;
-    
-    if (appliedLevel === 'City' && cityRate > 0) {
-      // Місто має особливу ставку
-      if (countyRate > 0) {
-        // Є і міська і окружна ставка
-        county_rate_component = (countyRate - 4) / 100; // Окружна частина (без державної)
-        city_rate_component = local_rate - county_rate_component;
-        
-        // Якщо різниця від'ємна - це може бути помилка в даних
-        if (city_rate_component < 0) {
-          special_rate = Math.abs(city_rate_component);
-          city_rate_component = 0;
-        }
-      } else {
-        // Тільки міська ставка
-        // Для великих міст як NYC розбиваємо на city + special (MCTD)
-        if (compositeRate >= 8.5) {
-          // NYC: 4% State + 4.5% City + 0.375% MCTD = 8.875%
-          city_rate_component = 0.045; // 4.5%
-          special_rate = local_rate - city_rate_component; // 0.375%
-        } else {
-          city_rate_component = local_rate;
-        }
-      }
-    } else {
-      // Тільки округ - весь місцевий податок йде в county
-      county_rate_component = local_rate;
-    }
-    
-    const tax_amount = amount * compositeRateDecimal;
-    const total_amount = amount + tax_amount;
-    
-    // Розбивка податку по компонентах
-    const state_tax = amount * state_rate;
-    const county_tax = amount * county_rate_component;
-    const city_tax = amount * city_rate_component;
-    const special_tax = amount * special_rate;
-
-    const result = {
-      subtotal: parseFloat(amount.toFixed(2)),
-      tax_amount: parseFloat(tax_amount.toFixed(2)),
-      total_amount: parseFloat(total_amount.toFixed(2)),
-      
-      tax_breakdown: {
-        composite_tax_rate: parseFloat(compositeRate.toFixed(3)) + '%',
-        state_rate: parseFloat((state_rate * 100).toFixed(3)) + '%',
-        state_tax: parseFloat(state_tax.toFixed(2)),
-        county_rate: parseFloat((county_rate_component * 100).toFixed(3)) + '%',
-        county_tax: parseFloat(county_tax.toFixed(2)),
-        city_rate: parseFloat((city_rate_component * 100).toFixed(3)) + '%',
-        city_tax: parseFloat(city_tax.toFixed(2)),
-        special_rates: parseFloat((special_rate * 100).toFixed(3)) + '%',
-        special_tax: parseFloat(special_tax.toFixed(2))
-      },
-
-      jurisdictions: {
-        applied_level: appliedLevel,
-        applied_name: appliedName,
-        city: city?.name || null,
-        county: county?.name || null
-      },
-
-      location: {
-        coordinates: { longitude: lng, latitude: lat }
-      }
-    };
-
-    res.json(result);
-
-  } catch (error) {
-    console.error('Tax calculation error:', error);
-    res.status(500).json({ 
-      error: 'Помилка при розрахунку податку',
-      details: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
-
-// API для отримання податкової ставки без розрахунку
 app.get('/tax-rate', async (req: Request, res: Response) => {
   try {
     const { longitude, latitude } = req.query;
@@ -424,6 +155,181 @@ app.get('/tax-rate', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Помилка при обробці запиту' });
+  }
+});
+
+// POST /calculate-tax - Розрахунок податку без створення замовлення
+app.post('/calculate-tax', async (req: Request, res: Response) => {
+  try {
+    const { subtotal, longitude, latitude } = req.body;
+
+    // Валідація
+    if (!subtotal || !longitude || !latitude) {
+      return res.status(400).json({ 
+        error: 'Необхідно вказати subtotal, longitude та latitude' 
+      });
+    }
+
+    const amount = parseFloat(subtotal);
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(amount) || isNaN(lng) || isNaN(lat)) {
+      return res.status(400).json({ 
+        error: 'Некоректні значення параметрів' 
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        error: 'Сума повинна бути більше 0' 
+      });
+    }
+
+    // Використовуємо функцію з orderService
+    const taxResult = await orderService.calculateTax(amount, lng, lat);
+
+    // Форматуємо відповідь
+    const result = {
+      subtotal: parseFloat(amount.toFixed(2)),
+      tax_amount: taxResult.tax_amount,
+      total_amount: taxResult.total_amount,
+      
+      tax_breakdown: {
+        composite_tax_rate: `${taxResult.compositeRate.toFixed(3)}%`,
+        state_rate: '4.000%',
+        state_tax: taxResult.state_tax,
+        county_rate: `${((taxResult.county_tax / amount) * 100).toFixed(3)}%`,
+        county_tax: taxResult.county_tax,
+        city_rate: `${((taxResult.city_tax / amount) * 100).toFixed(3)}%`,
+        city_tax: taxResult.city_tax,
+        special_rates: `${((taxResult.special_tax / amount) * 100).toFixed(3)}%`,
+        special_tax: taxResult.special_tax
+      },
+
+      jurisdictions: {
+        applied_level: taxResult.appliedLevel,
+        applied_name: taxResult.appliedName,
+        city: taxResult.cityName,
+        county: taxResult.countyName
+      },
+
+      location: {
+        coordinates: { longitude: lng, latitude: lat }
+      }
+    };
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Tax calculation error:', error);
+    res.status(500).json({ 
+      error: 'Помилка при розрахунку податку',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// ============================================
+// ORDERS ENDPOINTS
+// ============================================
+
+app.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const { user_id, subtotal, longitude, latitude } = req.body;
+
+    if (!user_id || !subtotal || !longitude || !latitude) {
+      return res.status(400).json({ 
+        error: 'Необхідно вказати user_id, subtotal, longitude та latitude' 
+      });
+    }
+
+    const userId = parseInt(user_id);
+    const amount = parseFloat(subtotal);
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(userId) || isNaN(amount) || isNaN(lng) || isNaN(lat)) {
+      return res.status(400).json({ 
+        error: 'Некоректні значення параметрів' 
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        error: 'Сума повинна бути більше 0' 
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ 
+        error: `Користувача з ID ${userId} не знайдено` 
+      });
+    }
+
+    const order = await orderService.createOrder({
+      user_id: userId,
+      subtotal: amount,
+      longitude: lng,
+      latitude: lat
+    });
+
+    res.status(201).json({
+      message: 'Замовлення успішно створено',
+      order
+    });
+
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ 
+      error: 'Помилка при створенні замовлення',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.get('/orders', async (req: Request, res: Response) => {
+  try {
+    const { page, limit, user_id, status, from_date, to_date } = req.query;
+
+    const params: any = {};
+
+    if (page) params.page = parseInt(page as string);
+    if (limit) params.limit = parseInt(limit as string);
+
+    if (user_id) {
+      const userId = parseInt(user_id as string);
+      if (!isNaN(userId)) {
+        params.user_id = userId;
+      }
+    }
+
+    if (status) {
+      params.status = status as string;
+    }
+
+    if (from_date) {
+      params.from_date = new Date(from_date as string);
+    }
+
+    if (to_date) {
+      params.to_date = new Date(to_date as string);
+    }
+
+    const result = await orderService.getOrders(params);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ 
+      error: 'Помилка при отриманні замовлень',
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
