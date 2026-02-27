@@ -18,8 +18,6 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { api } from "../../api/client";
 import type { Order } from "../../types/order.types";
 
-const MOCK_USER_ID = 1;
-
 function mapOrder(o: any): Order {
     return {
         id:        String(o.id),
@@ -59,7 +57,6 @@ export function OrdersList() {
                 const res: any = await api.orders.list({
                     page: currentPage,
                     limit: itemsPerPage,
-                    user_id: MOCK_USER_ID,
                     ...(statusFilter !== "all" ? { status: statusFilter } : {}),
                 });
                 setOrders(res.orders.map(mapOrder));

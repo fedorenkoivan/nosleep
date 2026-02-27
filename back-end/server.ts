@@ -586,6 +586,12 @@ app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+// Local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel Serverless
+export default app;

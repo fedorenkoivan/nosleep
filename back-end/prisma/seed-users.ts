@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
+import bcrypt from "bcrypt";
 import "dotenv/config";
 
 const connectionString = `${process.env.DATABASE_URL}`;
@@ -25,8 +26,17 @@ async function main() {
   }
   
   for (const userData of testUsers) {
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userData.password, salt);
+    
     const user = await prisma.user.create({
-      data: userData
+      data: {
+        name: userData.name,
+        email: userData.email,
+        password_hash: hashedPassword,
+        password_salt: salt
+      }
     });
     console.log(`✓ Created user: ${user.name} (ID: ${user.id})`);
   }
