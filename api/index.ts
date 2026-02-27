@@ -1,28 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Lazy-loaded Express app instance
-let expressApp: any = null;
+// Import Express app directly from back-end (will be compiled by Vercel)
+// @ts-ignore
+import app from '../back-end/server.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    console.log('[Vercel API] Incoming request:', {
-      method: req.method,
-      url: req.url,
-      headers: req.headers
-    });
-    
-    // Initialize Express app on first request
-    if (!expressApp) {
-      console.log('[Vercel API] Loading Express app...');
-      try {
-        const serverModule = await import('./dist/server.js');
-        expressApp = serverModule.default;
-        console.log('[Vercel API] Express app loaded successfully');
-      } catch (loadError) {
-        console.error('[Vercel API] Failed to load Express app:', loadError);
-        throw loadError;
-      }
-    }
+    console.log('[Vercel API] Request:', req.method, req.url);
     
     // Remove /api prefix from URL for Express
     const originalUrl = req.url;
@@ -35,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Forward request to Express
     // @ts-ignore - Vercel Request/Response are compatible with Express
-    return expressApp(req, res);
+    return app(req, res);
     
   } catch (error) {
     console.error('[Vercel API] Error:', error);
