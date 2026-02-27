@@ -7,11 +7,65 @@ import {
     LogOut,
     PieChart,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { api } from "../../api/client";
+
 interface SidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
 }
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+    const navigate = useNavigate();
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        // Try to get user from localStorage first
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (e) {
+                console.error('Failed to parse user from localStorage', e);
+            }
+        }
+
+        // Optionally, fetch fresh user data from API
+        const fetchUser = async () => {
+            try {
+                const response = await api.auth.me();
+                setUser(response.user);
+                localStorage.setItem('user', JSON.stringify(response.user));
+            } catch (error) {
+                console.error('Failed to fetch user', error);
+            }
+        };
+
+        if (localStorage.getItem('authToken')) {
+            fetchUser();
+        }
+    }, []);
+
+    const handleLogout = () => {
+        api.auth.logout();
+        navigate('/login');
+    };
+
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(word => word[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
     const navItems = [
         {
             id: "dashboard",
@@ -86,6 +140,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                     {bottomItems.map((item) => (
                         <button
                             key={item.id}
+                            onClick={() => item.id === 'logout' ? handleLogout() : onTabChange(item.id)}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#666666] hover:bg-surface hover:text-white transition-colors"
                         >
                             <item.icon className="w-5 h-5 text-[#444444]" />
@@ -95,14 +150,14 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 </div>
                 <div className="mt-6 flex items-center gap-3 px-2">
                     <div className="w-8 h-8 rounded-full bg-[#1A1A1A] flex items-center justify-center text-xs font-medium text-dark-text-secondary">
-                        JD
+                        {user ? getInitials(user.name) : 'U'}
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">
-                            John Doe
+                            {user?.name || 'Loading...'}
                         </p>
                         <p className="text-xs text-dark-text-tertiary truncate">
-                            admin@taxmanager.com
+                            {user?.email || ''}
                         </p>
                     </div>
                 </div>
