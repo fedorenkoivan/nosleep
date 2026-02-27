@@ -8,7 +8,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Initialize Express app on first request
     if (!expressApp) {
       console.log('[Vercel API] Loading Express app...');
-      const serverModule = await import('../back-end/dist/server.js');
+      const serverModule = await import('./dist/server.js');
       expressApp = serverModule.default;
       console.log('[Vercel API] Express app loaded successfully');
     }
