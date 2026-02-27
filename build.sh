@@ -14,8 +14,12 @@ mkdir -p api/generated
 mkdir -p api/prisma
 cp -r back-end/dist/* api/dist/
 cp -r back-end/generated/* api/generated/
-cp -r back-end/node_modules api/
 cp back-end/prisma/schema.prisma api/prisma/
+
+echo "📦 Installing api dependencies..."
+cd api
+npm install
+cd ..
 
 echo "🎨 Building frontend..."
 cd front-end
