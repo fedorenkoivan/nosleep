@@ -1,12 +1,12 @@
 import express, { type Request, type Response } from 'express';
 import { prisma } from './src/lib/prisma.js';
+import * as orderService from './src/services/orderService.js';
 
 const app = express();
 app.use(express.json());
 
 const PORT = 3000;
 
-// Типи для юрисдикцій
 interface Jurisdiction {
   name: string;
   level: 'city' | 'county';
@@ -16,8 +16,7 @@ app.get('/', (req: Request, res: Response) => {
   res.json({ message: "Hello from Express!" });
 });
 
-// Отримати географічне розташування за координатами
-app.get('/location', async (req: Request, res: Response) => {
+const getLocation = async (req: Request, res: Response) => {
   try {
     const { longitude, latitude } = req.query;
 
@@ -36,7 +35,6 @@ app.get('/location', async (req: Request, res: Response) => {
       });
     }
 
-    // Знаходимо округ (county)
     const county = await prisma.$queryRaw<Array<{
       name: string;
       abbrev: string;
@@ -49,7 +47,6 @@ app.get('/location', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    // Знаходимо місто
     const city = await prisma.$queryRaw<Array<{
       name: string;
       muni_type: string;
@@ -62,7 +59,6 @@ app.get('/location', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    // Знаходимо town якщо місто не знайдено
     const town = await prisma.$queryRaw<Array<{
       name: string;
       muni_type: string;
@@ -75,7 +71,6 @@ app.get('/location', async (req: Request, res: Response) => {
       LIMIT 1
     `;
 
-    // Знаходимо village
     const village = await prisma.$queryRaw<Array<{
       name: string;
       town: string;
@@ -104,23 +99,10 @@ app.get('/location', async (req: Request, res: Response) => {
     console.error('Error:', error);
     res.status(500).json({ error: 'Помилка при обробці запиту' });
   }
-});
-
-// Функція для отримання юрисдикції за координатами
-async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdiction[]> {
-  const jurisdictions = await prisma.$queryRaw<Jurisdiction[]>`
-    SELECT name, 'city' as level FROM ny_cities 
-    WHERE ST_Contains(geom, ST_SetSRID(ST_Point(${lng}, ${lat}), 4326))
-    UNION ALL
-    SELECT name, 'county' as level FROM ny_counties 
-    WHERE ST_Contains(geom, ST_SetSRID(ST_Point(${lng}, ${lat}), 4326))
-  `;
-  return jurisdictions;
 }
 
-// API для розрахунку податку
-app.post('/calculate-tax', async (req: Request, res: Response) => {
-  try {
+const getTax = async (req: Request, res: Response) => {
+    try {
     const { subtotal, longitude, latitude } = req.body;
 
     // Валідація вхідних даних
@@ -303,7 +285,19 @@ app.post('/calculate-tax', async (req: Request, res: Response) => {
       details: error instanceof Error ? error.message : String(error)
     });
   }
-});
+}
+
+// Функція для отримання юрисдикції за координатами
+async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdiction[]> {
+  const jurisdictions = await prisma.$queryRaw<Jurisdiction[]>`
+    SELECT name, 'city' as level FROM ny_cities 
+    WHERE ST_Contains(geom, ST_SetSRID(ST_Point(${lng}, ${lat}), 4326))
+    UNION ALL
+    SELECT name, 'county' as level FROM ny_counties 
+    WHERE ST_Contains(geom, ST_SetSRID(ST_Point(${lng}, ${lat}), 4326))
+  `;
+  return jurisdictions;
+}
 
 // API для отримання податкової ставки без розрахунку
 app.get('/tax-rate', async (req: Request, res: Response) => {
@@ -424,6 +418,117 @@ app.get('/tax-rate', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Помилка при обробці запиту' });
+  }
+});
+
+// ============================================
+// ORDERS ENDPOINTS
+// ============================================
+
+// POST /orders - Створення нового замовлення
+app.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const { user_id, subtotal, longitude, latitude } = req.body;
+
+    // Валідація
+    if (!user_id || !subtotal || !longitude || !latitude) {
+      return res.status(400).json({ 
+        error: 'Необхідно вказати user_id, subtotal, longitude та latitude' 
+      });
+    }
+
+    const userId = parseInt(user_id);
+    const amount = parseFloat(subtotal);
+    const lng = parseFloat(longitude);
+    const lat = parseFloat(latitude);
+
+    if (isNaN(userId) || isNaN(amount) || isNaN(lng) || isNaN(lat)) {
+      return res.status(400).json({ 
+        error: 'Некоректні значення параметрів' 
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ 
+        error: 'Сума повинна бути більше 0' 
+      });
+    }
+
+    // Перевіряємо чи існує користувач
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return res.status(404).json({ 
+        error: `Користувача з ID ${userId} не знайдено` 
+      });
+    }
+
+    // Створюємо замовлення через сервіс
+    const order = await orderService.createOrder({
+      user_id: userId,
+      subtotal: amount,
+      longitude: lng,
+      latitude: lat
+    });
+
+    res.status(201).json({
+      message: 'Замовлення успішно створено',
+      order
+    });
+
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ 
+      error: 'Помилка при створенні замовлення',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// GET /orders - Отримання списку замовлень з фільтрами та пагінацією
+app.get('/orders', async (req: Request, res: Response) => {
+  try {
+    const { page, limit, user_id, status, from_date, to_date } = req.query;
+
+    const params: any = {};
+
+    // Пагінація
+    if (page) params.page = parseInt(page as string);
+    if (limit) params.limit = parseInt(limit as string);
+
+    // Фільтри
+    if (user_id) {
+      const userId = parseInt(user_id as string);
+      if (!isNaN(userId)) {
+        params.user_id = userId;
+      }
+    }
+
+    if (status) {
+      params.status = status as string;
+    }
+
+    if (from_date) {
+      params.from_date = new Date(from_date as string);
+    }
+
+    if (to_date) {
+      params.to_date = new Date(to_date as string);
+    }
+
+    // Отримуємо замовлення через сервіс
+    const result = await orderService.getOrders(params);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ 
+      error: 'Помилка при отриманні замовлень',
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
