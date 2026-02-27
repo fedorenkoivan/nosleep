@@ -2,6 +2,7 @@
 @import "tailwindcss/theme";
 @import "tailwindcss/utilities";
 
+
 @theme {
     --color-accent: #c59dff;
     --color-accent-hover: #b080ff;
@@ -20,6 +21,8 @@
     --font-mono:
         ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", "Courier New", monospace;
+
+    
 }
 
 :root {
@@ -38,7 +41,7 @@ body {
     background-color: var(--bg-main);
     color: var(--text-primary);
 }
-/* Custom scrollbar for dark theme */
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -52,4 +55,24 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #444;
+}
+
+/*mine*/
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes floatInfinite {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-15px, -30px) rotate(8deg); }
+}
+
+.animate-marquee {
+  display: flex;
+  animation: marquee 25s linear infinite; /* Швидкість логотипів */
+}
+
+.animate-float {
+  animation: floatInfinite 8s ease-in-out infinite;
 }
