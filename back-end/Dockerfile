@@ -8,5 +8,7 @@ RUN npm install
 
 COPY back-end/ . 
 
+RUN npx prisma generate
+
 EXPOSE 3000
 CMD ["npx", "tsx", "watch", "server.ts"]

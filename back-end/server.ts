@@ -560,7 +560,7 @@ app.post('/orders/import', upload.single('file'), async (req: MulterRequest, res
     if (ordersToInsert.length > 0) {
       const inserted = await Promise.all(
         ordersToInsert.map(({ id, data }) =>
-          prisma.order.create({ data }).then((order) => ({ id, order_id: order.id }))
+          prisma.order.create({ data }).then((order:any) => ({ id, order_id: order.id }))
         )
       );
       success.push(...inserted);
