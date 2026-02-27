@@ -13,6 +13,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('[Vercel API] Express app loaded successfully');
     }
     
+    // Remove /api prefix from URL for Express
+    if (req.url?.startsWith('/api')) {
+      req.url = req.url.substring(4);
+    }
+    
     // Forward request to Express
     // @ts-ignore - Vercel Request/Response are compatible with Express
     return expressApp(req, res);
