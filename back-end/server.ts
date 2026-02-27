@@ -159,11 +159,29 @@ app.post('/calculate-tax', async (req: Request, res: Response) => {
     const city = jurisdictions.find(j => j.level === 'city');
     const county = jurisdictions.find(j => j.level === 'county');
     
-    let taxRate: number;
+    let compositeRate: number;
     let appliedLevel: string;
     let appliedName: string;
+    let cityRate: number = 0;
+    let countyRate: number = 0;
     
-    // Пріоритет: якщо є місто з особливою ставкою - використовуємо його
+    // Отримуємо ставку округу (якщо є)
+    if (county) {
+      const countyTaxData = await prisma.county_tax.findFirst({
+        where: {
+          county: {
+            contains: county.name,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      if (countyTaxData) {
+        countyRate = Number(countyTaxData.tax);
+      }
+    }
+    
+    // Отримуємо ставку міста (якщо є) - вона має пріоритет
     if (city) {
       const cityTaxData = await prisma.city_tax.findFirst({
         where: {
@@ -175,73 +193,77 @@ app.post('/calculate-tax', async (req: Request, res: Response) => {
       });
       
       if (cityTaxData) {
-        taxRate = Number(cityTaxData.tax);
+        cityRate = Number(cityTaxData.tax);
+        compositeRate = cityRate;
         appliedLevel = 'City';
         appliedName = cityTaxData.city;
-      } else {
-        // Якщо місто знайдено, але для нього немає ставки - використовуємо округ
-        if (!county) {
-          return res.status(404).json({ 
-            error: `Податкова ставка для міста ${city.name} не знайдена, і округ не визначено` 
-          });
-        }
-        
-        const countyTaxData = await prisma.county_tax.findFirst({
-          where: {
-            county: {
-              contains: county.name,
-              mode: 'insensitive'
-            }
-          }
-        });
-        
-        if (!countyTaxData) {
-          return res.status(404).json({ 
-            error: `Податкова ставка для округу ${county.name} не знайдена` 
-          });
-        }
-        
-        taxRate = Number(countyTaxData.tax);
+      } else if (countyRate > 0) {
+        compositeRate = countyRate;
         appliedLevel = 'County';
-        appliedName = countyTaxData.county;
-      }
-    } else if (county) {
-      // Якщо тільки округ
-      const countyTaxData = await prisma.county_tax.findFirst({
-        where: {
-          county: {
-            contains: county.name,
-            mode: 'insensitive'
-          }
-        }
-      });
-      
-      if (!countyTaxData) {
+        appliedName = county!.name;
+      } else {
         return res.status(404).json({ 
-          error: `Податкова ставка для округу ${county.name} не знайдена` 
+          error: `Податкова ставка не знайдена для ${city.name}` 
         });
       }
-      
-      taxRate = Number(countyTaxData.tax);
+    } else if (countyRate > 0) {
+      compositeRate = countyRate;
       appliedLevel = 'County';
-      appliedName = countyTaxData.county;
+      appliedName = county!.name;
     } else {
       return res.status(404).json({ 
-        error: 'Не вдалося визначити юрисдикцію' 
+        error: 'Не вдалося визначити податкову ставку' 
       });
     }
 
-    // Розрахунок податку (taxRate вже у відсотках, напр. 8.875)
-    const taxRateDecimal = taxRate / 100; // Перетворюємо у десятковий формат
+    // Розрахунок податку (compositeRate вже у відсотках, напр. 8.875)
+    const compositeRateDecimal = compositeRate / 100;
     const state_rate = 0.04; // 4% фіксована ставка штату NY
-    const local_rate = taxRateDecimal - state_rate; // Місцевий = Загальний - Штат
     
-    const tax_amount = amount * taxRateDecimal;
+    // Місцевий податок = Підсумковий - Державний
+    const local_rate = compositeRateDecimal - state_rate;
+    
+    // Розбиваємо місцевий податок на складові: county + city + special
+    let city_rate_component = 0;
+    let county_rate_component = 0;
+    let special_rate = 0;
+    
+    if (appliedLevel === 'City' && cityRate > 0) {
+      // Місто має особливу ставку
+      if (countyRate > 0) {
+        // Є і міська і окружна ставка
+        county_rate_component = (countyRate - 4) / 100; // Окружна частина (без державної)
+        city_rate_component = local_rate - county_rate_component;
+        
+        // Якщо різниця від'ємна - це може бути помилка в даних
+        if (city_rate_component < 0) {
+          special_rate = Math.abs(city_rate_component);
+          city_rate_component = 0;
+        }
+      } else {
+        // Тільки міська ставка
+        // Для великих міст як NYC розбиваємо на city + special (MCTD)
+        if (compositeRate >= 8.5) {
+          // NYC: 4% State + 4.5% City + 0.375% MCTD = 8.875%
+          city_rate_component = 0.045; // 4.5%
+          special_rate = local_rate - city_rate_component; // 0.375%
+        } else {
+          city_rate_component = local_rate;
+        }
+      }
+    } else {
+      // Тільки округ - весь місцевий податок йде в county
+      county_rate_component = local_rate;
+    }
+    
+    const tax_amount = amount * compositeRateDecimal;
     const total_amount = amount + tax_amount;
     
-    // Розбивка податку
+    // Розбивка податку по компонентах
     const state_tax = amount * state_rate;
-    const local_tax = amount * local_rate;
+    const county_tax = amount * county_rate_component;
+    const city_tax = amount * city_rate_component;
+    const special_tax = amount * special_rate;
 
     const result = {
       subtotal: parseFloat(amount.toFixed(2)),
@@ -249,11 +271,15 @@ app.post('/calculate-tax', async (req: Request, res: Response) => {
       total_amount: parseFloat(total_amount.toFixed(2)),
       
       tax_breakdown: {
-        composite_tax_rate: parseFloat(taxRate.toFixed(3)) + '%',
-        state_rate: '4.000%',
+        composite_tax_rate: parseFloat(compositeRate.toFixed(3)) + '%',
+        state_rate: parseFloat((state_rate * 100).toFixed(3)) + '%',
         state_tax: parseFloat(state_tax.toFixed(2)),
-        local_rate: parseFloat((local_rate * 100).toFixed(3)) + '%',
-        local_tax: parseFloat(local_tax.toFixed(2))
+        county_rate: parseFloat((county_rate_component * 100).toFixed(3)) + '%',
+        county_tax: parseFloat(county_tax.toFixed(2)),
+        city_rate: parseFloat((city_rate_component * 100).toFixed(3)) + '%',
+        city_tax: parseFloat(city_tax.toFixed(2)),
+        special_rates: parseFloat((special_rate * 100).toFixed(3)) + '%',
+        special_tax: parseFloat(special_tax.toFixed(2))
       },
 
       jurisdictions: {
