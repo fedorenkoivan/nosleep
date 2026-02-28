@@ -4,6 +4,11 @@
 
 **NoSleep** is a high-performance administrative dashboard designed for a drone delivery service operating across New York State. This project addresses a critical business challenge: automating complex Composite Sales Tax calculations based on precise GPS coordinates for Instant Wellness Kits.
 
+**Access the app [here](https://nosleep-iota.vercel.app)**
+**Test user:**
+**Name: parsival**
+**Password: firsttothekey**
+
 
 ## Business Solution: Automated Taxation 🎀
 
@@ -42,8 +47,7 @@ The backend calculates the final price using a prioritized hierarchy:
 
 
 ## Getting Started 🎀
-
-**To run application:**
+**To run application in development:**
 1. Clone this repository: `git clone https://github.com/fedorenkoivan/nosleep.git`
 2. Node is needed. Install it [here](https://nodejs.org/en).
 3. Verify that you in fact have node.js: `node --version`
