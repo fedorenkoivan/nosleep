@@ -33,6 +33,10 @@ interface Jurisdiction {
   level: 'city' | 'county';
 }
 
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok' });
+});
+
 async function getTaxJurisdiction(lng: number, lat: number): Promise<Jurisdiction[]> {
   const jurisdictions = await prisma.$queryRaw<Jurisdiction[]>`
     SELECT name, 'city' as level FROM ny_cities 
