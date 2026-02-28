@@ -169,8 +169,20 @@ export const api = {
       errors: { id: string; reason: string }[];
       orders: { id: string; order_id: number }[];
     }> => {
+      // Get user_id from localStorage
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        return Promise.reject(new Error('User not authenticated. Please log in.'));
+      }
+      
+      const user = JSON.parse(userStr);
+      if (!user.id) {
+        return Promise.reject(new Error('User ID not found. Please log in again.'));
+      }
+
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('user_id', user.id.toString());
 
       return fetchApi('/orders/import', {
         method: 'POST',
