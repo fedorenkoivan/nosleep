@@ -33,6 +33,10 @@ interface Jurisdiction {
   level: 'city' | 'county';
 }
 
+app.get('/', (req: Request, res: Response) => {
+  res.json({ message: 'Welcome to the No_Sleep API' });
+});
+
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
