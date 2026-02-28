@@ -6,7 +6,7 @@
 
 **Access the app [here](https://nosleep-iota.vercel.app)**
 **Test user:**
-**Name: parsival**
+**Email: readyfirstplayer@gmail.com**
 **Password: firsttothekey**
 
 
